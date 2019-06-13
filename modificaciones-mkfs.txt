@@ -1,0 +1,71 @@
+void
+iappend(uint inum, void *xp, int n)
+{
+  char *p = (char*)xp;
+  uint fbn, fbn_t, off, n1;
+  struct dinode din;
+  char buf[BSIZE];
+  uint indirect[NINDIRECT];
+  uint dindirect[NINDIRECT];
+  uint x;
+
+  rinode(inum, &din);
+  off = xint(din.size);
+  printf("append inum %d at off %d sz %d\n", inum, off, n);
+  while(n > 0){
+    fbn = off / BSIZE;
+    assert(fbn < MAXFILE);
+    if(fbn < NDIRECT){
+      if(xint(din.addrs[fbn]) == 0){
+        din.addrs[fbn] = xint(freeblock++);
+      }
+      x = xint(din.addrs[fbn]);
+      printf("append direct %d -> %d\n", fbn, x);
+    } else {
+      fbn_t = fbn - NDIRECT;
+
+      if (fbn_t < NINDIRECT) {
+        if(xint(din.addrs[NDIRECT]) == 0){
+          din.addrs[NDIRECT] = xint(freeblock++);
+        }
+        rsect(xint(din.addrs[NDIRECT]), (char*)indirect);
+        if(indirect[fbn_t] == 0){
+          indirect[fbn_t] = xint(freeblock++);
+          wsect(xint(din.addrs[NDIRECT]), (char*)indirect);
+        }
+        x = xint(indirect[fbn_t]);
+        printf("append indirect %d -> %d\n", fbn_t, x);
+      } else {
+        fbn_t = fbn_t - NINDIRECT;
+
+        if(xint(din.addrs[NDIRECT+1]) == 0){
+          din.addrs[NDIRECT+1] = xint(freeblock++);
+        }
+
+        rsect(xint(din.addrs[NDIRECT+1]), (char*)indirect);
+        if(indirect[fbn_t / NINDIRECT] == 0) {
+          indirect[fbn_t / NINDIRECT] = xint(freeblock++);
+          wsect(xint(din.addrs[NDIRECT+1]), (char*)indirect);
+        }
+
+        rsect(xint(indirect[fbn_t / NINDIRECT]), (char*)dindirect);
+        if(dindirect[fbn_t % NINDIRECT] == 0) {
+          dindirect[fbn_t % NINDIRECT] = xint(freeblock++);
+          wsect(xint(indirect[fbn_t / NINDIRECT]), (char*)dindirect);
+        }
+
+        x = xint(dindirect[fbn_t % NINDIRECT]);        
+        printf("append indirect2 %d -> %d\n", fbn_t % NINDIRECT, x);
+      }      
+    }
+    n1 = min(n, (fbn + 1) * BSIZE - off);
+    rsect(x, buf);
+    bcopy(p, buf + off - (fbn * BSIZE), n1);
+    wsect(x, buf);
+    n -= n1;
+    off += n1;
+    p += n1;
+  }
+  din.size = xint(off);  
+  winode(inum, &din);
+}
