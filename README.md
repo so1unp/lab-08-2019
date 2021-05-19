@@ -1,3 +1,5 @@
+# ARCHIVADO -- nueva versión: [lab-fs](https://github.com/so1unp/lab-fs)
+
 # Laboratorio 8 - Sistema de Archivos
 
 _xv6_ organiza el disco de la siguiente manera (ver archivo `fs.h` y `mkfs.c`):
